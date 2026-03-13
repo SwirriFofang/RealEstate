@@ -1,5 +1,5 @@
 // API Service for LandInvest Backend
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://realestate-t3v6.onrender.com';
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://realestate-sqf4.onrender.com';
 
 class ApiService {
   constructor() {
