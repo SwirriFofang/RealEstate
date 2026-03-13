@@ -8,11 +8,11 @@ export default defineConfig({
   server: {
     proxy: {
       '/api': {
-        target: 'https://realestate-sqf4.onrender.com',
+        target: 'https://realestate-2l1a.onrender.com',
         changeOrigin: true,
       },
       '/uploads': {
-        target: 'https://realestate-sqf4.onrender.com',
+        target: 'https://realestate-2l1a.onrender.com',
         changeOrigin: true,
       },
     },
