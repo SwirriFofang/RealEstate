@@ -36,7 +36,7 @@ if (process.env.NODE_ENV !== 'production') {
 
 app.use(cors({
   origin: process.env.NODE_ENV === 'production' 
-    ? ['https://yourdomain.com'] 
+    ? true // Allow any origin in production
     : ['http://localhost:3000', 'http://localhost:5173'],
   credentials: true
 }));
