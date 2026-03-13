@@ -1,0 +1,4 @@
+id,email,password_hash,full_name,role,is_approved,created_at,updated_at
+00000000-0000-0000-0000-000000000001,admin@landinvest.com,$2b$10$example_hash_admin123,Admin User,admin,true,2024-01-01 00:00:00,2024-01-01 00:00:00
+00000000-0000-0000-0000-000000000002,investor@example.com,$2b$10$example_hash_investor123,John Investor,investor,true,2024-01-01 00:00:00,2024-01-01 00:00:00
+00000000-0000-0000-0000-000000000003,owner@example.com,$2b$10$example_hash_owner123,Sarah Owner,project_owner,true,2024-01-01 00:00:00,2024-01-01 00:00:00
