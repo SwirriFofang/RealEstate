@@ -47,14 +47,19 @@ export default function CheckoutPage() {
 
   React.useEffect(() => {
     if (!isAuthed) {
-      navigate("/Login");
+      navigate("/Login", {
+        state: {
+          redirectTo: "/checkout",
+          checkoutState: location.state || null,
+        },
+      });
       return;
     }
 
     if (role !== "investor") {
       navigate("/");
     }
-  }, [isAuthed, role, navigate]);
+  }, [isAuthed, role, navigate, location.state]);
 
   const cameroonCountryCode = "+237";
   const phoneDigits = String(phone).replace(/\D/g, "");
@@ -230,6 +235,7 @@ export default function CheckoutPage() {
               </Link>
               <Link
                 to="/Investments"
+                state={{ fromCheckout: true }}
                 className="flex-1 inline-flex items-center justify-center h-12 rounded-xl bg-blue-800 text-white font-extrabold hover:bg-blue-700 transition"
               >
                 Back to Investments

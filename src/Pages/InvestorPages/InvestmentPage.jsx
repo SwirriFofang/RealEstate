@@ -1,6 +1,6 @@
 
 import React, { useEffect, useMemo, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 import landDouala from "../../assets/landDouala.png";
 import landSanpit from "../../assets/OIP.webp";
 import landYaounde from "../../assets/landyaounde.png";
@@ -47,12 +47,6 @@ const getListingImage = (listing) => {
   return investmentImages[key] || investmentImages["Sanpit"];
 };
 
-const parseFundedFractions = (fundedLabel) => {
-  const match = String(fundedLabel).match(/(\d+)\s*\/\s*(\d+)/);
-  if (!match) return { funded: 0, total: 0 };
-  return { funded: Number(match[1]), total: Number(match[2]) };
-};
-
 const parseFcfaAmount = (amountLabel) => {
   const raw = String(amountLabel ?? "").replace(/[^\d]/g, "");
   const value = Number(raw);
@@ -66,27 +60,20 @@ const formatFcfa = (value) => {
 };
 
 export default function Investments() {
-  const navigate = useNavigate();
+  const location = useLocation();
+  const [refreshKey, setRefreshKey] = useState(0);
   const [locationQuery, setLocationQuery] = useState("");
   const [priceQuery, setPriceQuery] = useState("");
   const [investments, setInvestments] = useState([]);
-  const [fractionCounts, setFractionCounts] = useState({});
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
 
-  const isAuthed = localStorage.getItem("li_auth") === "true";
-  const role = localStorage.getItem("li_role");
-
+  // Increment refreshKey when returning from checkout to force refetch
   useEffect(() => {
-    if (!isAuthed) {
-      navigate("/Login");
-      return;
+    if (location.state?.fromCheckout) {
+      setRefreshKey((k) => k + 1);
     }
-
-    if (role !== "investor") {
-      navigate("/");
-    }
-  }, [isAuthed, role, navigate]);
+  }, [location.state?.fromCheckout]);
 
   useEffect(() => {
     let isMounted = true;
@@ -101,7 +88,17 @@ export default function Investments() {
 
         const mapped = listings.map((l) => {
           const total = Number(l?.fractions) || 0;
-          const funded = Math.round(((Number(l?.progress) || 0) / 100) * total);
+          const investedFromApi = Number(l?.invested_fractions ?? l?.investedFractions);
+          const availableFromApi = Number(l?.available_fractions ?? l?.availableFractions);
+
+          const funded = Number.isFinite(investedFromApi)
+            ? investedFromApi
+            : Math.round(((Number(l?.progress) || 0) / 100) * total);
+
+          const available = Number.isFinite(availableFromApi)
+            ? Math.max(0, availableFromApi)
+            : Math.max(0, total - Math.max(0, funded));
+
           const daysLeft = Number(l?.days_left ?? l?.daysLeft ?? l?.duration_days ?? 0);
 
           return {
@@ -111,7 +108,8 @@ export default function Investments() {
             target: formatTargetAmount(l.target_amount ?? l.targetAmount),
             targetAmount: Number(l?.target_amount ?? l?.targetAmount) || 0,
             totalFractions: total,
-            fundedFractions: funded,
+            fundedFractions: Math.max(0, funded),
+            availableFractions: available,
             funded: `${Math.max(0, funded)}/${Math.max(0, total)} Fractions Funded`,
             days: `${Math.max(0, daysLeft)} Days Left`,
             status: l.status || "active",
@@ -122,13 +120,6 @@ export default function Investments() {
 
         if (isMounted) {
           setInvestments(mapped);
-          setFractionCounts((prev) => {
-            const next = { ...prev };
-            mapped.forEach((m) => {
-              if (next[m.id] == null) next[m.id] = 1;
-            });
-            return next;
-          });
         }
       } catch (e) {
         if (isMounted) {
@@ -146,14 +137,15 @@ export default function Investments() {
     return () => {
       isMounted = false;
     };
-  }, []);
+  }, [location.key, refreshKey]);
 
   const normalizedLocationQuery = locationQuery.trim().toLowerCase();
   const normalizedPriceQuery = priceQuery.trim().toLowerCase();
 
   const filteredInvestments = useMemo(() => investments.filter((inv) => {
-    const { funded, total } = parseFundedFractions(inv.funded);
-    const isSuccessful = total > 0 && funded === total;
+    const funded = Number(inv.fundedFractions) || 0;
+    const total = Number(inv.totalFractions) || 0;
+    const isSuccessful = total > 0 && funded >= total;
     if (isSuccessful) return false;
 
     const haystack = `${inv.location} ${inv.title}`.toLowerCase();
@@ -161,7 +153,7 @@ export default function Investments() {
       ? haystack.includes(normalizedLocationQuery)
       : true;
 
-    const { total: totalFractions } = parseFundedFractions(inv.funded);
+    const totalFractions = total;
     const targetValue = parseFcfaAmount(inv.target);
     const pricePerFraction = totalFractions > 0 ? targetValue / totalFractions : 0;
     const priceHaystack = `${formatFcfa(pricePerFraction)} ${pricePerFraction}`.toLowerCase();
@@ -171,8 +163,6 @@ export default function Investments() {
 
     return matchesLocation && matchesPrice;
   }), [investments, normalizedLocationQuery, normalizedPriceQuery]);
-
-  if (!isAuthed || role !== "investor") return null;
 
   return (
     <div className="bg-slate-50 min-h-screen">
@@ -265,14 +255,15 @@ export default function Investments() {
                            hover:shadow-sky-200/40 relative"
               >
                 {(() => {
-                  const { funded, total } = parseFundedFractions(item.funded);
-                  const remaining = Math.max(0, total - funded);
-                  const showSoonGone = total > 0 && remaining <= 5;
+                  const total = Number(item.totalFractions) || 0;
+                  const remaining = Number(item.availableFractions);
+                  const safeRemaining = Number.isFinite(remaining) ? remaining : Math.max(0, total - (Number(item.fundedFractions) || 0));
+                  const showSoonGone = total > 0 && safeRemaining <= 5 && safeRemaining > 0;
                   if (!showSoonGone) return null;
 
                   return (
                     <div className="absolute left-0 top-0 z-20 pointer-events-none">
-                      <div className="origin-top-left -rotate-30 -translate-x-10 translate-y-15 bg-red-600 text-white font-extrabold uppercase tracking-wider text-xs px-12 py-2 shadow-lg">
+                      <div className="origin-top-left -rotate-12 -translate-x-10 translate-y-4 bg-red-600 text-white font-extrabold uppercase tracking-wider text-xs px-12 py-2 shadow-lg">
                         Soon Gone
                       </div>
                     </div>
@@ -282,11 +273,11 @@ export default function Investments() {
                   <img
                     src={item.image}
                     alt="Land"
-                    className="h-40 w-full object-cover"
+                    className="h-48 w-full object-cover"
                   />
                   {item.status === "open" && (
                     <span className="absolute top-3 right-3 bg-blue-800 text-white text-xs px-3 py-1 rounded">
-                      Open
+                      Approved
                     </span>
                   )}
                   {item.status === "expired" && (
@@ -298,37 +289,33 @@ export default function Investments() {
 
                 <div className="p-5">
                   <h3 className="font-semibold text-lg">{item.title}</h3>
-                  <p className="text-sm text-gray-500">{item.location}</p>
+                  <div className="flex justify-between text-sm text-gray-600 mt-2">
+                    <span>{item.days}</span>
+                    <span className="font-medium">{item.target}</span>
+                  </div>
 
-                  <div className="mt-4 text-sm space-y-1">
-                    <p>
-                      <span className="font-medium">Target:</span> {item.target}
-                    </p>
-                    {(() => {
-                      const { total } = parseFundedFractions(item.funded);
-                      const targetValue = parseFcfaAmount(item.target);
-                      const pricePerFraction = total > 0 ? targetValue / total : 0;
-                      return (
-                        <div className="mt-2 flex items-center justify-between rounded-lg border border-blue-100 bg-blue-50 px-3 py-2">
-                          <span className="text-xs font-semibold text-blue-900 uppercase tracking-wide">Price per fraction</span>
-                          <span className="text-sm font-extrabold text-blue-900">{formatFcfa(pricePerFraction)}</span>
-                        </div>
-                      );
-                    })()}
-                    <p className="flex justify-between">
-                      <span>{item.funded}</span>
-                      <span>{item.days}</span>
-                    </p>
+                  <div className="mt-3 flex items-center justify-between rounded-lg border border-blue-100 bg-blue-50 px-3 py-2">
+                    <span className="text-xs font-semibold text-blue-900 uppercase tracking-wide">Price per fraction</span>
+                    <span className="text-sm font-extrabold text-blue-900">
+                      {(() => {
+                        const total = Number(item.totalFractions) || 0;
+                        const targetValue = parseFcfaAmount(item.target);
+                        return formatFcfa(total > 0 ? targetValue / total : 0);
+                      })()}
+                    </span>
                   </div>
 
                   {(() => {
-                    const { funded, total } = parseFundedFractions(item.funded);
-                    const remaining = Math.max(0, total - funded);
+                    const funded = Number(item.fundedFractions) || 0;
+                    const total = Number(item.totalFractions) || 0;
+                    const remaining = Number.isFinite(Number(item.availableFractions))
+                      ? Number(item.availableFractions)
+                      : Math.max(0, total - funded);
                     const percentage = total > 0 ? Math.round((funded / total) * 100) : 0;
 
                     return (
                       <>
-                        <div className="w-full bg-gray-200 rounded-full h-3 mt-4">
+                        <div className="w-full bg-gray-200 rounded-full h-3 mt-3">
                           <div
                             className="bg-blue-800 h-3 rounded-full"
                             style={{ width: `${percentage}%` }}
@@ -336,84 +323,15 @@ export default function Investments() {
                         </div>
                         <p className="text-xs text-gray-500 mt-1">
                           {funded}/{total} Fractions Funded
-                          {total > 0 ? ` • ${remaining} Left` : ""}
+                          {total > 0 ? ` • ${remaining} Fractions Left` : ""}
                         </p>
                       </>
                     );
                   })()}
 
-                  <div className="mt-4 flex items-center justify-between gap-3">
-                    <div className="flex items-center rounded-md border border-slate-200 overflow-hidden">
-                      <button
-                        type="button"
-                        className="h-10 w-10 bg-slate-50 text-slate-800 font-bold hover:bg-slate-100"
-                        onClick={() =>
-                          setFractionCounts((prev) => ({
-                            ...prev,
-                            [item.id]: Math.max(1, (Number(prev[item.id]) || 1) - 1),
-                          }))
-                        }
-                      >
-                        -
-                      </button>
-                      <div className="h-10 w-12 flex items-center justify-center font-bold text-slate-900">
-                        {Number(fractionCounts[item.id]) || 1}
-                      </div>
-                      <button
-                        type="button"
-                        className="h-10 w-10 bg-slate-50 text-slate-800 font-bold hover:bg-slate-100"
-                        onClick={() => {
-                          const { funded, total } = parseFundedFractions(item.funded);
-                          const remaining = Math.max(0, total - funded);
-                          setFractionCounts((prev) => ({
-                            ...prev,
-                            [item.id]: Math.min(remaining || 1, (Number(prev[item.id]) || 1) + 1),
-                          }));
-                        }}
-                      >
-                        +
-                      </button>
-                    </div>
-
-                    <button
-                      type="button"
-                      className="flex-1 h-10 rounded-md bg-slate-900 text-white font-semibold hover:bg-slate-800 transition disabled:opacity-50 disabled:cursor-not-allowed"
-                      disabled={(() => {
-                        const { funded, total } = parseFundedFractions(item.funded);
-                        return total > 0 && funded >= total;
-                      })()}
-                      onClick={() => {
-                        const count = Number(fractionCounts[item.id]) || 1;
-                        navigate("/checkout", {
-                          state: {
-                            listingId: item.id,
-                            fractionCount: count,
-                            investment: {
-                              id: item.id,
-                              title: item.title,
-                              location: item.location,
-                              targetAmount: item.targetAmount,
-                              totalFractions: item.totalFractions,
-                              target: item.target,
-                              funded: item.funded,
-                            },
-                          },
-                        });
-                      }}
-                    >
-                      Commit Fractions
-                    </button>
-                  </div>
-
                   <Link
                     to={`/investments/${item.id}`}
-                    className={`mt-5 block text-center w-full py-2 rounded-md font-semibold text-white ${
-                      item.status === "funded"
-                        ? "bg-blue-800 hover:bg-blue-700"
-                        : item.status === "expired"
-                        ? "bg-gray-300 cursor-not-allowed"
-                        : "bg-blue-800 hover:bg-blue-700"
-                    }`}
+                    className="mt-5 block text-center w-full py-2 rounded-md font-semibold text-white bg-blue-800 hover:bg-blue-700 transition"
                   >
                     View Details
                   </Link>

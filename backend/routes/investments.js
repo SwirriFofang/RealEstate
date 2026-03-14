@@ -140,7 +140,8 @@ router.post('/', authMiddleware, [
     const { data: totalInvested } = await supabase
       .from(TABLES.INVESTMENTS)
       .select('fractions')
-      .eq('listing_id', listingId);
+      .eq('listing_id', listingId)
+      .eq('status', 'confirmed');
 
     const investedFractions = totalInvested?.reduce((sum, inv) => sum + inv.fractions, 0) || 0;
     const availableFractions = listing.fractions - investedFractions;
@@ -159,7 +160,7 @@ router.post('/', authMiddleware, [
         investor_id: req.user.userId,
         fractions,
         amount,
-        status: 'pending'
+        status: 'confirmed'
       }])
       .select()
       .single();

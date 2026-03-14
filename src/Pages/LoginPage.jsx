@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { EyeIcon, EyeOffIcon, Mail } from "lucide-react";
 import { useAuth } from "../contexts/AuthContext";
 
@@ -13,6 +13,7 @@ const LoginPage = () => {
   const [loading, setLoading] = useState(false);
   
   const navigate = useNavigate();
+  const location = useLocation();
   const { login, clearError } = useAuth();
 
   const handleInputChange = (e) => {
@@ -40,6 +41,13 @@ const LoginPage = () => {
 
     try {
       await login(formData);
+
+      const redirectTo = location.state?.redirectTo;
+      const checkoutState = location.state?.checkoutState;
+      if (redirectTo) {
+        navigate(redirectTo, { state: checkoutState || null });
+        return;
+      }
       
       // Navigate based on user role and approval status
       const user = JSON.parse(localStorage.getItem('user') || '{}');

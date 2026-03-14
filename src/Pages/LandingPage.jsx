@@ -86,7 +86,7 @@ export default function LandingPage() {
       try {
         setListingsLoading(true);
         setListingsError("");
-        const data = await apiService.getListings({ limit: 3, status: 'active' });
+        const data = await apiService.getListings({ limit: 50 });
         const rows = Array.isArray(data?.listings) ? data.listings : [];
         if (isMounted) {
           setListings(rows);
@@ -257,8 +257,17 @@ export default function LandingPage() {
               </div>
             ) : listings.map((l, i) => {
               const totalFractions = Number(l?.fractions) || 0;
-              const percentage = Math.max(0, Math.min(100, Number(l?.progress) || 0));
-              const fractionsFunded = totalFractions > 0 ? Math.round((percentage / 100) * totalFractions) : 0;
+              const investedFromApi = Number(l?.invested_fractions ?? l?.investedFractions);
+              const availableFromApi = Number(l?.available_fractions ?? l?.availableFractions);
+
+              const funded = Number.isFinite(investedFromApi)
+                ? investedFromApi
+                : Math.round(((Number(l?.progress) || 0) / 100) * totalFractions);
+
+              const available = Number.isFinite(availableFromApi)
+                ? Math.max(0, availableFromApi)
+                : Math.max(0, totalFractions - Math.max(0, funded));
+
               const daysLeft = Number(l?.days_left ?? l?.daysLeft ?? l?.duration_days ?? 0);
               const targetLabel = formatFcfa(l?.target_amount ?? l?.targetAmount);
               const image = getListingImage(l);
@@ -271,6 +280,13 @@ export default function LandingPage() {
                          hover:-translate-y-3 hover:scale-105 hover:shadow-xl
                          hover:shadow-sky-200/40 relative"
                 >
+                  {available <= 5 && available > 0 && (
+                    <div className="absolute left-0 top-0 z-20 pointer-events-none">
+                      <div className="origin-top-left -rotate-12 -translate-x-10 translate-y-4 bg-red-600 text-white font-extrabold uppercase tracking-wider text-xs px-12 py-2 shadow-lg">
+                        Soon Gone
+                      </div>
+                    </div>
+                  )}
                   <img src={image} className="h-48 w-full object-cover" alt={`Land in ${l.location}`} />
 
                   <div className="p-5 relative z-10">
@@ -289,11 +305,12 @@ export default function LandingPage() {
                     <div className="w-full bg-gray-200 rounded-full h-3 mt-3">
                       <div
                         className="bg-blue-800 h-3 rounded-full"
-                        style={{ width: `${totalFractions > 0 ? (fractionsFunded / totalFractions) * 100 : 0}%` }}
+                        style={{ width: `${totalFractions > 0 ? (funded / totalFractions) * 100 : 0}%` }}
                       ></div>
                     </div>
                     <p className="text-xs text-gray-500 mt-1">
-                      {fractionsFunded}/{totalFractions} Fractions Funded
+                      {funded}/{totalFractions} Fractions Funded
+                      {totalFractions > 0 ? ` • ${available} Fractions Left` : ""}
                     </p>
 
                     {/* LINKED TO INVESTMENT DETAIL PAGE */}

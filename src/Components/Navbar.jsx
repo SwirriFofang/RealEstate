@@ -29,7 +29,7 @@ const Navbar = () => {
           Menu
         </button>
         <Link to="/" className="flex items-center gap-2 text-xl font-bold text-blue-800">
-          <span className="hidden md:inline">🌿</span>
+          <span className="hidden md:inline"></span>
           <span>LandInvest</span>
         </Link>
       </div>

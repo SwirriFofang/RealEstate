@@ -1,5 +1,5 @@
-import React, { useMemo, useState, useEffect } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import React, { useMemo, useState, useEffect, useCallback } from "react";
+import { Link } from "react-router-dom";
 import landDouala from "../../assets/landDouala.png";
 import landSanpit from "../../assets/OIP.webp";
 import landYaounde from "../../assets/landyaounde.png";
@@ -20,26 +20,11 @@ const investmentImages = {
 
 
 export default function SuccessfulInvestmentsPage() {
-  const navigate = useNavigate();
   const [locationQuery, setLocationQuery] = useState("");
   const [priceQuery, setPriceQuery] = useState("");
   const [listings, setListings] = useState([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
-
-  const isAuthed = localStorage.getItem("li_auth") === "true";
-  const role = localStorage.getItem("li_role");
-
-  useEffect(() => {
-    if (!isAuthed) {
-      navigate("/Login");
-      return;
-    }
-
-    if (role !== "investor") {
-      navigate("/");
-    }
-  }, [isAuthed, role, navigate]);
 
   useEffect(() => {
     let isMounted = true;
@@ -62,7 +47,7 @@ export default function SuccessfulInvestmentsPage() {
     return () => { isMounted = false; };
   }, []);
 
-  const mapListingToInvestment = (l) => {
+  const mapListingToInvestment = useCallback((l) => {
     const total = Number(l?.fractions) || 0;
     const progress = Number(l?.progress) || 0;
     const funded = total > 0 ? Math.round((progress / 100) * total) : 0;
@@ -79,7 +64,7 @@ export default function SuccessfulInvestmentsPage() {
       image: getListingImage(l),
       __raw: l,
     };
-  };
+  }, []);
 
   const getListingImage = (listing) => {
     const media = Array.isArray(listing?.media) ? listing.media : [];
@@ -93,7 +78,7 @@ export default function SuccessfulInvestmentsPage() {
     return investmentImages[key] || investmentImages["Sanpit"];
   };
 
-  const investments = useMemo(() => listings.map(mapListingToInvestment), [listings]);
+  const investments = useMemo(() => listings.map(mapListingToInvestment), [listings, mapListingToInvestment]);
 
   const successfulInvestments = useMemo(() => {
     return investments.filter((inv) => {
@@ -101,8 +86,6 @@ export default function SuccessfulInvestmentsPage() {
       return total > 0 && funded === total;
     });
   }, [investments]);
-
-  if (!isAuthed || role !== "investor") return null;
 
   const normalizedLocationQuery = locationQuery.trim().toLowerCase();
   const normalizedPriceQuery = priceQuery.trim().toLowerCase();
@@ -123,8 +106,6 @@ export default function SuccessfulInvestmentsPage() {
 
     return matchesLocation && matchesPrice;
   });
-
-  if (!isAuthed || role !== "investor") return null;
 
   return (
     <div className="bg-slate-50 min-h-screen">

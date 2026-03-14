@@ -44,8 +44,43 @@ router.get('/', async (req, res) => {
       return res.status(500).json({ error: 'Failed to fetch listings' });
     }
 
+    const listingIds = Array.isArray(listings) ? listings.map((l) => l.id).filter(Boolean) : [];
+    let investedFractionsByListingId = {};
+
+    if (listingIds.length > 0) {
+      const { data: investments, error: invError } = await supabase
+        .from(TABLES.INVESTMENTS)
+        .select('listing_id, fractions')
+        .eq('status', 'confirmed')
+        .in('listing_id', listingIds);
+
+      if (invError) {
+        return res.status(500).json({ error: 'Failed to fetch listings' });
+      }
+
+      investedFractionsByListingId = (investments || []).reduce((acc, inv) => {
+        const id = inv?.listing_id;
+        if (!id) return acc;
+        const f = Number(inv?.fractions) || 0;
+        acc[id] = (acc[id] || 0) + f;
+        return acc;
+      }, {});
+    }
+
+    const enrichedListings = (listings || []).map((l) => {
+      const total = Number(l?.fractions) || 0;
+      const invested = investedFractionsByListingId[l.id] || 0;
+      const available = Math.max(0, total - invested);
+
+      return {
+        ...l,
+        invested_fractions: invested,
+        available_fractions: available,
+      };
+    });
+
     res.json({
-      listings,
+      listings: enrichedListings,
       pagination: {
         page: parseInt(page),
         limit: parseInt(limit),
@@ -83,7 +118,27 @@ router.get('/:id', async (req, res) => {
       return res.status(500).json({ error: 'Failed to fetch listing' });
     }
 
-    res.json({ listing });
+    const { data: investments, error: invError } = await supabase
+      .from(TABLES.INVESTMENTS)
+      .select('fractions')
+      .eq('listing_id', id)
+      .eq('status', 'confirmed');
+
+    if (invError) {
+      return res.status(500).json({ error: 'Failed to fetch listing' });
+    }
+
+    const investedFractions = (investments || []).reduce((sum, inv) => sum + (Number(inv?.fractions) || 0), 0);
+    const totalFractions = Number(listing?.fractions) || 0;
+    const availableFractions = Math.max(0, totalFractions - investedFractions);
+
+    res.json({
+      listing: {
+        ...listing,
+        invested_fractions: investedFractions,
+        available_fractions: availableFractions,
+      },
+    });
 
   } catch (error) {
     console.error('Listing fetch error:', error);

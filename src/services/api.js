@@ -1,5 +1,5 @@
 // API Service for LandInvest Backend
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://realestate-2l1a.onrender.com';
+const API_BASE_URL = (import.meta?.env?.VITE_API_BASE_URL || '/api').replace(/\/+$/, '');
 
 class ApiService {
   constructor() {
@@ -48,7 +48,7 @@ class ApiService {
         (msg.toLowerCase().includes('failed to fetch') || msg.toLowerCase().includes('networkerror'))
       ) {
         throw new Error(
-          `Backend not reachable. Make sure the backend server is running and accessible (expected via Vite proxy at http://localhost:5000).`
+          'Backend not reachable. Make sure the backend server is running on http://localhost:5000 and the Vite dev server proxy is enabled.'
         );
       }
 

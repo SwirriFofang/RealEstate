@@ -51,17 +51,6 @@ const InvestmentDetailPage = () => {
   const role = localStorage.getItem("li_role");
 
   useEffect(() => {
-    if (!isAuthed) {
-      navigate("/Login");
-      return;
-    }
-
-    if (role !== "investor") {
-      navigate("/");
-    }
-  }, [isAuthed, role, navigate]);
-
-  useEffect(() => {
     let isMounted = true;
 
     const load = async () => {
@@ -103,8 +92,6 @@ const InvestmentDetailPage = () => {
   const heroImage = images?.[0]?.file_path
     ? apiService.getFileUrl(images[0].file_path)
     : getFallbackImage(listing?.location);
-
-  if (!isAuthed || role !== "investor") return null;
 
   if (loading) {
     return (
@@ -166,6 +153,11 @@ const InvestmentDetailPage = () => {
             <MapPin className="w-4 h-4 text-sky-300" />
             <span className="text-sm font-medium">{listing.location}</span>
           </div>
+          {listing.status === "active" && (
+            <div className="mt-3 inline-flex">
+              <span className="bg-blue-800 text-white text-xs font-bold px-3 py-1 rounded">Approved</span>
+            </div>
+          )}
         </div>
       </div>
 
@@ -293,23 +285,43 @@ const InvestmentDetailPage = () => {
             <button
               disabled={remainingFractions === 0}
               className="w-full bg-blue-800 text-white py-4 rounded-lg font-bold text-lg hover:bg-blue-700 transition-all shadow-lg shadow-blue-100 disabled:opacity-50"
-              onClick={() =>
-                navigate("/checkout", {
-                  state: {
-                    listingId: id,
-                    fractionCount,
-                    investment: {
-                      id: listing.id,
-                      title: listing.title,
-                      location: listing.location,
-                      targetAmount: targetAmount,
-                      totalFractions: totalFractions,
-                      target: formatFcfa(targetAmount),
-                      funded: `${fundedFractions}/${totalFractions} Fractions Funded`,
-                    },
+              onClick={() => {
+                const checkoutState = {
+                  listingId: id,
+                  fractionCount,
+                  investment: {
+                    id: listing.id,
+                    title: listing.title,
+                    location: listing.location,
+                    targetAmount: listing.target_amount ?? listing.targetAmount,
+                    totalFractions: listing.fractions,
+                    target: formatFcfa(listing.target_amount ?? listing.targetAmount),
+                    funded: `${fundedFractions}/${totalFractions} Fractions Funded`,
                   },
-                })
-              }
+                };
+
+                if (!isAuthed) {
+                  navigate("/Login", {
+                    state: {
+                      redirectTo: "/checkout",
+                      checkoutState,
+                    },
+                  });
+                  return;
+                }
+
+                if (role && role !== "investor") {
+                  navigate("/Login", {
+                    state: {
+                      redirectTo: "/checkout",
+                      checkoutState,
+                    },
+                  });
+                  return;
+                }
+
+                navigate("/checkout", { state: checkoutState });
+              }}
             >
               Commit {fractionCount} Fraction(s)
             </button>

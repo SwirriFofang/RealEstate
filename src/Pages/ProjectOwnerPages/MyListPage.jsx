@@ -5,7 +5,6 @@ import apiService from '../../services/api';
 
 const MyListPage = () => {
   const navigate = useNavigate();
-  const [selectedListing, setSelectedListing] = useState(null);
   const [myListings, setMyListings] = useState([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState('');
@@ -283,11 +282,13 @@ const MyListPage = () => {
                     <button className="p-2 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 transition">
                       <Download className="w-4 h-4" />
                     </button>
-                    <button 
+                    <button
+                      type="button"
                       onClick={() => navigate(`/my-list/${listing.id}`)}
-                      className="p-2 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 transition"
+                      className="inline-flex items-center gap-2 px-3 py-2 bg-blue-50 text-blue-700 rounded-lg hover:bg-blue-100 transition text-sm font-bold"
                     >
                       <Eye className="w-4 h-4" />
+                      View Details
                     </button>
                   </div>
                 </div>
